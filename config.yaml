@@ -1,0 +1,27 @@
+source:
+  type: csv
+  file: data/clientes_interacciones.csv
+  table: null
+  query: null
+  db:
+    host: localhost
+    port: 5432
+    user: user
+    password: password
+    database: database
+  api:
+    endpoint: https://api.example.com/data
+    headers: {}
+    params: {}
+columns:
+  id_cliente: id_cliente
+  fecha_interaccion: fecha_interaccion
+  monto_compra: monto_compra
+  conversion: conversion
+  abandono: abandono
+  tiempo_respuesta: tiempo_respuesta
+  intentos_contacto: intentos_contacto
+  region: region
+  canal: canal
+  ejecutivo: ejecutivo
+  score_riesgo: score_riesgo
