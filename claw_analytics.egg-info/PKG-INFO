@@ -1,0 +1,309 @@
+Metadata-Version: 2.4
+Name: claw-analytics
+Version: 0.1.0
+Summary: Open-source commercial analytics platform with Streamlit dashboard and FastAPI scoring API
+License: MIT
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: pandas>=2.0
+Requires-Dist: numpy>=1.24
+Requires-Dist: scikit-learn>=1.3
+Requires-Dist: joblib>=1.3
+Requires-Dist: fastapi>=0.110
+Requires-Dist: uvicorn[standard]>=0.29
+Requires-Dist: streamlit>=1.33
+Requires-Dist: plotly>=5.20
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: requests>=2.31
+Requires-Dist: click>=8.1
+Requires-Dist: python-dotenv>=1.0
+Requires-Dist: pydantic>=2.0
+Provides-Extra: postgres
+Requires-Dist: psycopg2-binary>=2.9; extra == "postgres"
+Provides-Extra: mysql
+Requires-Dist: pymysql>=1.1; extra == "mysql"
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest-cov>=5.0; extra == "dev"
+Requires-Dist: httpx>=0.27; extra == "dev"
+
+# 🐾 Infinix-ClawAnalytics
+
+Open-source commercial analytics platform: ingests CSV/DB/API data, builds customer features (RFM + trends), trains a conversion-risk model, segments customers with KMeans clustering, and serves insights via a Streamlit dashboard and FastAPI scoring endpoint. Includes synthetic data generation and basic observability logs.
+
+---
+
+## Features
+
+| Component | Description |
+|-----------|-------------|
+| **Data Ingestion** | CSV files, PostgreSQL, MySQL, HTTP APIs — all normalised to a canonical schema |
+| **Feature Engineering** | RFM (Recency, Frequency, Monetary) + rolling-window spend trends |
+| **Conversion-Risk Model** | GradientBoosting classifier — outputs per-customer conversion probability |
+| **Customer Clustering** | KMeans segmentation with human-readable labels (Low-Value → Champions) |
+| **Artifact Store** | Parquet features/scores, Joblib models, JSON run metadata |
+| **FastAPI Scoring API** | `/score`, `/score/transactions`, `/segments`, `/health`, `/reload` |
+| **Streamlit Dashboard** | KPIs, risk histogram, segment pie chart, RFM scatter, spend trends |
+| **Synthetic Data** | Realistic customer transaction generator for demos/testing |
+| **CLI** | `claw` command with subcommands for every workflow stage |
+
+---
+
+## Quick Start
+
+### 1 – Install
+
+```bash
+pip install -e .
+# Optional DB drivers:
+# pip install psycopg2-binary  # PostgreSQL
+# pip install pymysql          # MySQL
+```
+
+### 2 – Generate synthetic data
+
+```bash
+claw generate-data --output data/transactions.csv --n-customers 1000
+```
+
+### 3 – Train the full pipeline
+
+```bash
+claw train \
+  --input data/transactions.csv \
+  --artifacts-dir artifacts \
+  --n-clusters 4 \
+  --run-id my_run
+```
+
+Output:
+```
+→ Loading transactions …
+→ Building customer features (RFM + trends) …
+  ✓ Features → artifacts/my_run/features.parquet
+→ Training conversion-risk model …
+  ✓ Model saved  AUC=0.8617
+→ Fitting 4-cluster segmentation …
+  ✓ Cluster model saved  inertia=383.14
+  ✓ Scores → artifacts/my_run/scores.parquet
+  ✓ Metadata → artifacts/my_run/metadata.json
+✓ Training complete.
+```
+
+### 4 – Score customers from new data
+
+```bash
+claw score \
+  --input data/new_transactions.csv \
+  --model artifacts/my_run/model.joblib \
+  --output scores_output.csv
+```
+
+### 5 – Launch the Streamlit dashboard
+
+```bash
+claw serve-dashboard --scores artifacts/my_run/scores.parquet
+# → Opens on http://localhost:8501
+```
+
+### 6 – Start the FastAPI scoring API
+
+```bash
+# Set env vars to point to your model artifacts
+export CLAW_MODEL_PATH=artifacts/my_run/model.joblib
+export CLAW_CLUSTER_PATH=artifacts/my_run/cluster_model.joblib
+
+claw serve-api --port 8000
+# → API docs at http://localhost:8000/docs
+```
+
+---
+
+## API Reference
+
+### `GET /health`
+
+```json
+{
+  "status": "ok",
+  "model_loaded": true,
+  "cluster_model_loaded": true
+}
+```
+
+### `POST /score`
+
+Score customers from pre-computed features.
+
+```bash
+curl -X POST http://localhost:8000/score \
+  -H "Content-Type: application/json" \
+  -d '[{
+    "customer_id": "CUST-00001",
+    "recency_days": 5,
+    "frequency": 10,
+    "monetary": 1000.0,
+    "avg_order_value": 100.0,
+    "spend_last_30d": 500.0
+  }]'
+```
+
+Response:
+
+```json
+[{
+  "customer_id": "CUST-00001",
+  "conversion_risk": 0.85,
+  "cluster_id": 3,
+  "segment": "Champions"
+}]
+```
+
+### `POST /score/transactions`
+
+Score customers directly from raw transaction rows (features are computed server-side).
+
+```bash
+curl -X POST http://localhost:8000/score/transactions \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"customer_id": "A", "order_date": "2024-01-01", "order_value": 100.0},
+    {"customer_id": "A", "order_date": "2024-02-15", "order_value": 200.0}
+  ]'
+```
+
+### `GET /segments`
+
+Returns the current cluster segment map.
+
+### `POST /reload`
+
+Hot-reloads model artifacts from disk (useful after retraining without restarting).
+
+---
+
+## Data Ingestion
+
+```python
+from claw_analytics.ingest import load_csv, load_postgres, load_mysql, load_api
+
+# CSV
+df = load_csv("data/transactions.csv")
+
+# PostgreSQL
+df = load_postgres(
+    table="transactions",
+    host="localhost", database="analytics",
+    user="user", password="secret"
+)
+
+# MySQL
+df = load_mysql(
+    table="transactions",
+    host="localhost", database="analytics",
+    user="user", password="secret"
+)
+
+# HTTP API (expects JSON list or {data_key: [...]} response)
+df = load_api("https://api.example.com/transactions", data_key="records")
+```
+
+All loaders return a DataFrame with **standardised column names**:
+
+| Raw name(s) | Canonical name |
+|---|---|
+| `CustomerID`, `cust_id` | `customer_id` |
+| `OrderDate`, `purchase_date` | `order_date` |
+| `Amount`, `revenue`, `total` | `order_value` |
+| `Category`, `ProductCategory` | `product_category` |
+| `Converted`, `label` | `is_converted` |
+
+---
+
+## Python API
+
+```python
+from claw_analytics.synthetic_data import generate
+from claw_analytics.features import build_features, add_conversion_label
+from claw_analytics.model import train, predict_proba, save_model
+from claw_analytics.cluster import fit_clusters, assign_clusters
+from claw_analytics.artifacts import write_scores, write_metadata
+
+# 1. Generate (or load) transactions
+transactions = generate(n_customers=1000, seed=42)
+
+# 2. Build features
+features = build_features(transactions)
+features = add_conversion_label(features, transactions)
+
+# 3. Train conversion-risk model
+model_result = train(features)
+print(f"AUC: {model_result['auc']:.4f}")
+
+# 4. Cluster customers
+cluster_result = fit_clusters(features, n_clusters=4)
+features = assign_clusters(cluster_result, features)
+
+# 5. Score
+features["conversion_risk"] = predict_proba(
+    model_result["model"], features, model_result["feature_cols"]
+)
+
+# 6. Persist
+write_scores(features, artifacts_dir="artifacts", run_id="demo")
+```
+
+---
+
+## Project Structure
+
+```
+Infinix-ClawAnalytics/
+├── claw_analytics/          # Core library
+│   ├── ingest.py            # CSV / DB / API ingestion + column standardisation
+│   ├── features.py          # RFM + trend feature engineering
+│   ├── model.py             # Conversion-risk model training & inference
+│   ├── cluster.py           # KMeans customer segmentation
+│   ├── artifacts.py         # Parquet / JSON artifact persistence
+│   ├── synthetic_data.py    # Synthetic transaction data generator
+│   └── cli.py               # Click CLI entrypoints
+├── api/
+│   └── main.py              # FastAPI scoring API
+├── dashboard/
+│   └── app.py               # Streamlit analytics dashboard
+├── tests/                   # pytest test suite
+│   ├── test_ingest.py
+│   ├── test_features.py
+│   ├── test_model.py
+│   ├── test_cluster.py
+│   ├── test_synthetic_data.py
+│   └── test_api.py
+├── pyproject.toml
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Running Tests
+
+```bash
+pip install -e ".[dev]"
+pytest tests/ -v
+```
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `CLAW_MODEL_PATH` | `artifacts/model.joblib` | Path to the trained model artifact |
+| `CLAW_CLUSTER_PATH` | `artifacts/cluster_model.joblib` | Path to the cluster model artifact |
+| `CLAW_SCORES_PATH` | `artifacts/scores.parquet` | Path to the scored customers file (dashboard) |
+
+---
+
+## License
+
+MIT
