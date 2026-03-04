@@ -24,6 +24,9 @@ This project now includes a modular analyzer for commercial behavior and convers
 - Behavior clustering and executive performance insights
 - Executive dashboard with filters and alerts
 - FastAPI scoring endpoint
+- CSV wizard with templates, diagnostics, and auto-mapping
+- Configurable dashboard labels for any domain
+- Calibrated probabilities and cross-validation metrics
 
 ### Quickstart
 
@@ -44,6 +47,26 @@ Launch the dashboard:
 ```
 streamlit run infinix_clawanalytics/analyzer/dashboard_app.py
 ```
+
+### Dashboard modes
+
+- `csv_wizard`: upload CSV, map columns, and run pipeline in-memory.
+- `configured`: read `config.yaml` (CSV/DB/API) and run pipeline.
+- `scored`: load a previously generated scored file.
+
+The wizard can optionally save the scored output for later use.
+
+### CSV wizard tips
+
+- Use the mapping dropdowns to align your CSV fields to required columns.
+- Save templates for reuse across files with the same schema.
+- Use the CSV diagnostics to spot invalid dates or flags and download bad rows.
+- Use Reset and Delete scored when you want a clean start.
+
+### Configure sources in UI
+
+In `configured` mode, the dashboard can generate `config.yaml` for CSV, Postgres,
+MySQL, or API sources from the sidebar form.
 
 Launch the API:
 
@@ -95,6 +118,11 @@ Si es CSV, puedes sobreescribir el archivo asi:
 ```
 python -m infinix_clawanalytics.enterprise --run-pipeline --source csv --file data/mi_archivo.csv
 ```
+
+### Scored output
+
+By default, the pipeline writes to `artifacts/clientes_scored.parquet`.
+The dashboard `scored` mode reads that file.
 
 ## Project structure
 

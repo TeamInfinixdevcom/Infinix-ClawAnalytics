@@ -96,7 +96,19 @@ def score_customer(payload: ScoreRequest) -> ScoreResponse:
     except KeyError as exc:
         raise HTTPException(status_code=400, detail=f"Missing feature: {exc}") from exc
 
-    prob = float(app.state.model.predict_proba(X)[:, 1][0])
+    model_obj = app.state.model
+    if isinstance(model_obj, dict):
+        if model_obj.get("use_calibrated") and model_obj.get("calibrator") is not None:
+            predictor = model_obj["calibrator"]
+        else:
+            predictor = model_obj.get("model")
+    else:
+        predictor = model_obj
+
+    if predictor is None:
+        raise HTTPException(status_code=500, detail="Model not available")
+
+    prob = float(predictor.predict_proba(X)[:, 1][0])
     cluster_id = None
 
     if app.state.cluster_bundle is not None:

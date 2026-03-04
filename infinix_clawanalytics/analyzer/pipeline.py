@@ -34,7 +34,16 @@ def run_pipeline_from_dataframe(
         df = pl.from_pandas(df)
 
     features = build_customer_features(df)
+    if features.is_empty():
+        raise ValueError(
+            "No rows after feature engineering. Check fecha_interaccion parsing and required columns."
+        )
     features_pd = features.to_pandas()
+
+    if "conversion_rate" not in features_pd.columns:
+        raise ValueError(
+            "Feature engineering did not produce 'conversion_rate'. Verify conversion column mapping."
+        )
 
     scored_pd, metrics, _metadata = train_risk_model(features_pd)
     clustered_pd, cluster_stats = cluster_customers(scored_pd, n_clusters=n_clusters)

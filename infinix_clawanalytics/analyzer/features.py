@@ -12,8 +12,10 @@ def build_customer_features(df: pl.DataFrame) -> pl.DataFrame:
         return df
 
     max_date = df["fecha_interaccion"].max()
+    recent_30 = max_date - timedelta(days=30)
     recent_start = max_date - timedelta(days=90)
     prior_start = max_date - timedelta(days=180)
+    recent_180 = max_date - timedelta(days=180)
 
     grouped = (
         df.group_by("id_cliente")
@@ -30,6 +32,41 @@ def build_customer_features(df: pl.DataFrame) -> pl.DataFrame:
                 pl.mean("conversion").alias("conversion_rate"),
                 pl.mean("abandono").alias("abandonment_rate"),
                 pl.mean("score_riesgo").alias("score_riesgo_avg"),
+                pl.when(pl.col("fecha_interaccion") >= recent_30)
+                .then(1)
+                .otherwise(0)
+                .sum()
+                .alias("frequency_30d"),
+                pl.when(pl.col("fecha_interaccion") >= recent_start)
+                .then(1)
+                .otherwise(0)
+                .sum()
+                .alias("frequency_90d"),
+                pl.when(pl.col("fecha_interaccion") >= recent_30)
+                .then(pl.col("monto_compra"))
+                .otherwise(None)
+                .sum()
+                .alias("monetary_sum_30d"),
+                pl.when(pl.col("fecha_interaccion") >= recent_start)
+                .then(pl.col("monto_compra"))
+                .otherwise(None)
+                .sum()
+                .alias("monetary_sum_90d"),
+                pl.when(pl.col("fecha_interaccion") >= recent_start)
+                .then(pl.col("conversion"))
+                .otherwise(None)
+                .mean()
+                .alias("conversion_rate_90d"),
+                pl.when(pl.col("fecha_interaccion") >= recent_180)
+                .then(pl.col("conversion"))
+                .otherwise(None)
+                .mean()
+                .alias("conversion_rate_180d"),
+                pl.when(pl.col("fecha_interaccion") >= recent_start)
+                .then(pl.col("abandono"))
+                .otherwise(None)
+                .mean()
+                .alias("abandonment_rate_90d"),
                 pl.when(pl.col("fecha_interaccion") >= recent_start)
                 .then(pl.col("monto_compra"))
                 .otherwise(None)

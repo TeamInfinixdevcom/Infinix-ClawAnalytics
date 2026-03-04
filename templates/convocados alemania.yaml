@@ -1,0 +1,15 @@
+name: convocados alemania
+columns:
+  id_cliente: cedula
+  fecha_interaccion: fecha_partido
+  monto_compra: goles_anotados
+  conversion: convocado
+  abandono: tarjetas_rojas
+  tiempo_respuesta: MINUTOS JUGADOS_s
+  intentos_contacto: Toques de balon
+  region: region
+  canal: visoria presencial
+  ejecutivo: entrenador
+source:
+  type: csv
+  file: data/mi_archivo.csv

@@ -113,6 +113,8 @@ def load_source_config(path: str | Path) -> SourceConfig:
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"Config file not found: {path}")
+    if path.is_dir():
+        raise ValueError(f"Config path points to a directory, expected a file: {path}")
 
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     source = raw.get("source", {})
@@ -184,10 +186,45 @@ def standardize_dataframe(df: pd.DataFrame, columns_mapping: Dict[str, str]) -> 
         if col not in df.columns:
             df[col] = 50.0
 
+    for flag_col in ("conversion", "abandono"):
+        if flag_col in df.columns:
+            if df[flag_col].dtype == object:
+                normalized = (
+                    df[flag_col]
+                    .astype(str)
+                    .str.strip()
+                    .str.lower()
+                    .replace(
+                        {
+                            "si": 1,
+                            "sí": 1,
+                            "yes": 1,
+                            "true": 1,
+                            "1": 1,
+                            "no": 0,
+                            "false": 0,
+                            "0": 0,
+                        }
+                    )
+                )
+                df[flag_col] = pd.to_numeric(normalized, errors="coerce")
+            else:
+                df[flag_col] = pd.to_numeric(df[flag_col], errors="coerce")
+
+            invalid_mask = df[flag_col].isna() | ~df[flag_col].isin([0, 1])
+            if invalid_mask.any():
+                samples = df.loc[invalid_mask, flag_col].head(5).tolist()
+                raise ValueError(
+                    f"Invalid values for {flag_col}. Expected 0/1 or yes/no. Examples: {samples}"
+                )
+
     df["fecha_interaccion"] = pd.to_datetime(df["fecha_interaccion"], errors="coerce")
 
     if df["fecha_interaccion"].isna().any():
-        raise ValueError("Invalid fecha_interaccion values detected after parsing")
+        invalid_count = int(df["fecha_interaccion"].isna().sum())
+        raise ValueError(
+            f"Invalid fecha_interaccion values detected after parsing. Rows with invalid dates: {invalid_count}"
+        )
 
     return df
 

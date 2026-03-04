@@ -1,6 +1,4 @@
-source:
-  type: csv
-  file: data/mi_archivo.csv
+name: revision
 columns:
   id_cliente: id_cliente
   fecha_interaccion: fecha_interaccion
@@ -12,3 +10,6 @@ columns:
   region: region
   canal: canal
   ejecutivo: ejecutivo
+source:
+  type: csv
+  file: data/mi_archivo.csv

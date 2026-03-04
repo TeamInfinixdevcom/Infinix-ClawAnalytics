@@ -23,6 +23,12 @@ pip install -r requirements.txt
 streamlit run infinix_clawanalytics/analyzer/dashboard_app.py
 ```
 
+## CSV workflow
+
+- Use the CSV wizard to map fields and validate data.
+- Save templates in the wizard for repeated schemas.
+- Use the CSV diagnostics button to spot invalid dates or flags.
+
 ## Pull requests
 
 - Keep PRs focused and small.
